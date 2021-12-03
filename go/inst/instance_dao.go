@@ -21,7 +21,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/go-sql-driver/mysql"
 	"regexp"
 	"runtime"
 	"sort"
@@ -29,6 +28,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
@@ -463,21 +464,73 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				defer waitGroup.Done()
 				semiSyncMasterPluginLoaded := false
 				semiSyncReplicaPluginLoaded := false
-				err := sqlutils.QueryRowsMap(db, "show global variables like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
-					if m.GetString("Variable_name") == "rpl_semi_sync_master_enabled" {
+				instance.SemiSyncAvailable = false
+
+				// Let's learn if semi-sync plugin is loaded and what is its version
+				err := sqlutils.QueryRowsMap(db, "show global variables like 'rpl_semi_sync_%_enabled'", func(m sqlutils.RowMap) error {
+					variableName := m.GetString("Variable_name")
+					if variableName == "rpl_semi_sync_master_enabled" {
 						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
 						semiSyncMasterPluginLoaded = true
-					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_timeout" {
-						instance.SemiSyncMasterTimeout = m.GetUint64("Value")
-					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_wait_for_slave_count" {
-						instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("Value")
-					} else if m.GetString("Variable_name") == "rpl_semi_sync_slave_enabled" {
+						instance.SemiSyncPluginNewVersion = false
+					} else if variableName == "rpl_semi_sync_source_enabled" {
+						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
+						semiSyncMasterPluginLoaded = true
+						instance.SemiSyncPluginNewVersion = true
+					} else if variableName == "rpl_semi_sync_slave_enabled" {
 						instance.SemiSyncReplicaEnabled = (m.GetString("Value") == "ON")
 						semiSyncReplicaPluginLoaded = true
+						instance.SemiSyncPluginNewVersion = false
+					} else if variableName == "rpl_semi_sync_replica_enabled" {
+						instance.SemiSyncReplicaEnabled = (m.GetString("Value") == "ON")
+						semiSyncReplicaPluginLoaded = true
+						instance.SemiSyncPluginNewVersion = true
 					}
 					return nil
 				})
+				if err != nil {
+					errorChan <- err
+					return
+				}
+
+				// If the semi-sync plugin is loaded, query for additional info
+				if semiSyncMasterPluginLoaded {
+					query := "show global variables like 'rpl_semi_sync_%'"
+					err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+						variableName := string(m.GetString("VariableName"))
+
+						matched, regexperr := regexp.MatchString("^rpl_semi_sync_(master|source)_timeout$", variableName)
+						if regexperr != nil {
+							return regexperr
+						}
+						if matched {
+							instance.SemiSyncMasterTimeout = m.GetUint64("Value")
+							return nil
+						}
+
+						matched, regexperr = regexp.MatchString("^rpl_semi_sync_(master|source)_wait_for_slave_count$", variableName)
+						if regexperr != nil {
+							return regexperr
+						}
+						if matched {
+							instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("Value")
+							return nil
+						}
+
+						return nil
+					})
+				}
+
+				// todo: check if old one and new one can be mixed
 				instance.SemiSyncAvailable = (semiSyncMasterPluginLoaded && semiSyncReplicaPluginLoaded)
+				/*
+					log.Debugf("%v, SemiSyncMasterEnabled: %v", instance.Key, instance.SemiSyncMasterEnabled)
+					log.Debugf("%v, SemiSyncReplicaEnabled: %v", instance.Key, instance.SemiSyncReplicaEnabled)
+					log.Debugf("%v, SemiSyncPluginNewVersion: %v", instance.Key, instance.SemiSyncPluginNewVersion)
+					log.Debugf("%v, SemiSyncAvailable: %v", instance.Key, instance.SemiSyncAvailable)
+					log.Debugf("%v, SemiSyncMasterTimeout: %v", instance.Key, instance.SemiSyncMasterTimeout)
+					log.Debugf("%v, SemiSyncMasterWaitForReplicaCount: %v", instance.Key, instance.SemiSyncMasterWaitForReplicaCount)
+				*/
 				errorChan <- err
 			}()
 		}
@@ -486,16 +539,39 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			go func() {
 				defer waitGroup.Done()
 				err := sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
-					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
+					variableName := m.GetString("Variable_name")
+					matched, regexperr := regexp.MatchString("^Rpl_semi_sync_(master|source)_status$", variableName)
+					if regexperr != nil {
+						return regexperr
+					}
+					if matched {
 						instance.SemiSyncMasterStatus = (m.GetString("Value") == "ON")
-					} else if m.GetString("Variable_name") == "Rpl_semi_sync_master_clients" {
-						instance.SemiSyncMasterClients = m.GetUint("Value")
-					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
-						instance.SemiSyncReplicaStatus = (m.GetString("Value") == "ON")
+						return nil
 					}
 
+					matched, regexperr = regexp.MatchString("^Rpl_semi_sync_(master|source)_clients$", variableName)
+					if regexperr != nil {
+						return regexperr
+					}
+					if matched {
+						instance.SemiSyncMasterClients = m.GetUint("Value")
+						return nil
+					}
+
+					matched, regexperr = regexp.MatchString("^Rpl_semi_sync_(slave|replica)_status$", variableName)
+					if regexperr != nil {
+						return regexperr
+					}
+					if matched {
+						instance.SemiSyncReplicaStatus = (m.GetString("Value") == "ON")
+					}
 					return nil
 				})
+				/*
+					log.Debugf("%v, SemiSyncMasterStatus: %v", instance.Key, instance.SemiSyncMasterStatus)
+					log.Debugf("%v, SemiSyncMasterClients: %v", instance.Key, instance.SemiSyncMasterClients)
+					log.Debugf("%v, SemiSyncReplicaStatus: %v", instance.Key, instance.SemiSyncReplicaStatus)
+				*/
 				errorChan <- err
 			}()
 		}
