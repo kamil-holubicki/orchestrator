@@ -466,9 +466,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				semiSyncReplicaPluginLoaded := false
 				instance.SemiSyncAvailable = false
 
-				// Let's learn if semi-sync plugin is loaded and what is its version
-				err := sqlutils.QueryRowsMap(db, "show global variables like 'rpl_semi_sync_%_enabled'", func(m sqlutils.RowMap) error {
+				err := sqlutils.QueryRowsMap(db, "show global variables like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
 					variableName := m.GetString("Variable_name")
+					// Learn if semi-sync plugin is loaded and what is its version
 					if variableName == "rpl_semi_sync_master_enabled" {
 						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
 						semiSyncMasterPluginLoaded = true
@@ -485,20 +485,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 						instance.SemiSyncReplicaEnabled = (m.GetString("Value") == "ON")
 						semiSyncReplicaPluginLoaded = true
 						instance.SemiSyncPluginNewVersion = true
-					}
-					return nil
-				})
-				if err != nil {
-					errorChan <- err
-					return
-				}
-
-				// If the semi-sync plugin is loaded, query for additional info
-				if semiSyncMasterPluginLoaded {
-					query := "show global variables like 'rpl_semi_sync_%'"
-					err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-						variableName := string(m.GetString("VariableName"))
-
+					} else {
+						// additional info
 						matched, regexperr := regexp.MatchString("^rpl_semi_sync_(master|source)_timeout$", variableName)
 						if regexperr != nil {
 							return regexperr
@@ -516,12 +504,14 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 							instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("Value")
 							return nil
 						}
-
-						return nil
-					})
+					}
+					return nil
+				})
+				if err != nil {
+					errorChan <- err
+					return
 				}
 
-				// todo: check if old one and new one can be mixed
 				instance.SemiSyncAvailable = (semiSyncMasterPluginLoaded && semiSyncReplicaPluginLoaded)
 				/*
 					log.Debugf("%v, SemiSyncMasterEnabled: %v", instance.Key, instance.SemiSyncMasterEnabled)
