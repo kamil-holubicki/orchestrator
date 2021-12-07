@@ -14,7 +14,7 @@ command="$1"
 case "$command" in
   "test")
     docker_target="orchestrator-test"
-    docker build . -f docker/Dockerfile.test -t "${docker_target}" && docker run --rm -it "${docker_target}:latest"
+    docker build . -f docker/Dockerfile.test -t "${docker_target}" && docker run --rm -it --env TARBALL_URL=${TARBALL_URL} --env RUN_TESTS=${RUN_TESTS} --env ALLOW_TESTS_FAILURES=${ALLOW_TESTS_FAILURES} "${docker_target}:latest"
 #    docker build . -f docker/Dockerfile.test -t "${docker_target}" && docker run -i -t --net host -v /home/kamil/Downloads:/data "${docker_target}:latest" /bin/bash
     ;;
   "alpine")
@@ -39,7 +39,6 @@ case "$command" in
   "system")
     docker_target="orchestrator-system"
     docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run --rm -it -p 3000:3000 --env TARBALL_URL=${TARBALL_URL} --env RUN_TESTS=${RUN_TESTS} --env ALLOW_TESTS_FAILURES=${ALLOW_TESTS_FAILURES} "${docker_target}:latest" 
-#    docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run -i -t --net host --rm -it -p 3000:3000 "${docker_target}:latest" /bin/bash
     ;;
   "raft")
     docker_target="orchestrator-raft"
