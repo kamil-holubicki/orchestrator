@@ -38,8 +38,7 @@ case "$command" in
     ;;
   "system")
     docker_target="orchestrator-system"
-    -i -t --net host
-    docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run --rm -it -p 3000:3000 "${docker_target}:latest"
+    docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run --rm -it -p 3000:3000 --env TARBALL_URL=${TARBALL_URL} --env RUN_TESTS=${RUN_TESTS} --env ALLOW_TESTS_FAILURES=${ALLOW_TESTS_FAILURES} "${docker_target}:latest" 
 #    docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run -i -t --net host --rm -it -p 3000:3000 "${docker_target}:latest" /bin/bash
     ;;
   "raft")

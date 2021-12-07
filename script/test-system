@@ -1,13 +1,8 @@
 #!/bin/bash
 
 system_tests() {
-  # make 8.0 stuff 1st in the path
-  #cp /root/opt/mysql/8.0.26/bin/mysql* /usr/bin/
-  export PATH=/root/opt/mysql/8.0.26/bin/:$PATH
-  PATH=/root/opt/mysql/8.0.26/bin/:$PATH
-  echo PATH: $PATH
-
   echo "# Running system tests"
+  echo PATH: $PATH
   ./tests/system/test.sh || exit 1
 }
 
