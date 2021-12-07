@@ -8,13 +8,25 @@ RUN rm -rf /var/lib/apt/lists/*
 ENV WORKPATH /go/src/github.com/openark/orchestrator
 WORKDIR $WORKPATH
 
-RUN curl -O "https://raw.githubusercontent.com/openark/orchestrator-ci-env/master/bin/linux/dbdeployer.gz"
-RUN curl -O "https://raw.githubusercontent.com/openark/orchestrator-ci-env/master/mysql-tarballs/mysql-5.7.26.tar.xz"
-RUN gunzip ./dbdeployer.gz
-RUN chmod +x ./dbdeployer
-RUN mkdir -p ./sandbox/binary
+#RUN curl -O "https://raw.githubusercontent.com/openark/orchestrator-ci-env/master/bin/linux/dbdeployer.gz"
+#RUN curl -O "https://raw.githubusercontent.com/openark/orchestrator-ci-env/master/mysql-tarballs/mysql-5.7.26.tar.xz"
+#RUN gunzip ./dbdeployer.gz
+#RUN chmod +x ./dbdeployer
+#RUN mkdir -p ./sandbox/binary
 
-RUN ./dbdeployer unpack mysql-5.7.26.tar.xz --sandbox-binary $WORKPATH/sandbox/binary
+#RUN ./dbdeployer defaults update reserved-ports '0'
+#RUN ./dbdeployer unpack mysql-5.7.26.tar.xz --sandbox-binary $WORKPATH/sandbox/binary
+
+
+RUN wget https://github.com/datacharmer/dbdeployer/releases/download/v1.64.0/dbdeployer-1.64.0.linux.tar.gz
+#RUN wget wget https://downloads.percona.com/downloads/Percona-Server-8.0/Percona-Server-8.0.26-16/binary/tarball/Percona-Server-8.0.26-16-Linux.x86_64.glibc2.12.tar.gz
+COPY docker/Percona-Server-8.0.26-16-Linux.x86_64.glibc2.12.tar.gz ./
+
+RUN tar -xf dbdeployer-1.64.0.linux.tar.gz
+RUN ln -s dbdeployer-1.64.0.linux dbdeployer
+RUN ./dbdeployer defaults update reserved-ports '0'
+RUN mkdir -p ./sandbox/binary
+RUN ./dbdeployer unpack Percona-Server-8.0.26-16-Linux.x86_64.glibc2.12.tar.gz --sandbox-binary $WORKPATH/sandbox/binary
 
 COPY . .
 

@@ -311,7 +311,7 @@ test_all() {
           echo "$test_name" >> $tests_successful_file
         else
           echo "$test_name" >> $tests_failed_file
-          exit 1
+          # KH: exit 1
         fi
       else
         : # echo "# should not attempt $test_name"

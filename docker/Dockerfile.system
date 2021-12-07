@@ -7,7 +7,15 @@ RUN apt-get install -y sudo haproxy python git jq rsync libaio1 libnuma1 mysql-c
 RUN mkdir /orchestrator
 WORKDIR /orchestrator
 
-RUN git clone https://github.com/openark/orchestrator-ci-env.git # cache
+#RUN git clone https://github.com/openark/orchestrator-ci-env.git # cache
+COPY docker/orchestrator-ci-env /orchestrator/orchestrator-ci-env
+
+RUN mkdir /dbdeployer
+RUN (cd /dbdeployer && wget https://github.com/datacharmer/dbdeployer/releases/download/v1.64.0/dbdeployer-1.64.0.linux.tar.gz)
+RUN (cd /dbdeployer && tar -xf dbdeployer-1.64.0.linux.tar.gz)
+RUN (cd /dbdeployer && ln -s dbdeployer-1.64.0.linux dbdeployer)
+RUN (cd /dbdeployer && ./dbdeployer defaults update reserved-ports '0')
+
 
 RUN (cd /orchestrator/orchestrator-ci-env && cp bin/linux/systemctl.py /usr/bin/systemctl)
 RUN (cd /orchestrator/orchestrator-ci-env && script/deploy-haproxy)

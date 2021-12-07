@@ -15,6 +15,7 @@ case "$command" in
   "test")
     docker_target="orchestrator-test"
     docker build . -f docker/Dockerfile.test -t "${docker_target}" && docker run --rm -it "${docker_target}:latest"
+#    docker build . -f docker/Dockerfile.test -t "${docker_target}" && docker run -i -t --net host -v /home/kamil/Downloads:/data "${docker_target}:latest" /bin/bash
     ;;
   "alpine")
     docker_target="orchestrator-alpine"
@@ -37,7 +38,9 @@ case "$command" in
     ;;
   "system")
     docker_target="orchestrator-system"
+    -i -t --net host
     docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run --rm -it -p 3000:3000 "${docker_target}:latest"
+#    docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run -i -t --net host --rm -it -p 3000:3000 "${docker_target}:latest" /bin/bash
     ;;
   "raft")
     docker_target="orchestrator-raft"
