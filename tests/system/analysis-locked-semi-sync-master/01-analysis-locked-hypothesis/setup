@@ -2,7 +2,8 @@
 
 set -e
 
-#!/bin/bash
+# Let caretakingTick to cleanup all ExpireStaleInstanceBinlogCoordinates indications
+sleep 90
 
 orchestrator-client -c enable-semi-sync-master -i 127.0.0.1:10111
 
