@@ -1361,6 +1361,9 @@ function Cluster() {
             } else {
               location.reload();
             }
+          }).fail(function (operationResult){
+            hideLoader();
+            addAlert(operationResult.responseJSON.Message)
           });
         }
       }
