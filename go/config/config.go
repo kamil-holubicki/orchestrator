@@ -142,6 +142,8 @@ type Configuration struct {
 	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	UseSuperReadOnly                           bool     // Should orchestrator super_read_only any time it sets read_only
 	InstancePollSeconds                        uint     // Number of seconds between instance reads
+	DeadInstancePollSecondsMultiplyFactor      float32  // InstancePoolSeconds increase factor for dead instances read time calculation
+	DeadInstancePollSecondsMax				   uint		// Maximum delay between dead instance read attempts
 	ReasonableInstanceCheckSeconds             uint     // Number of seconds an instance read is allowed to take before it is considered invalid, i.e. before LastCheckValid will be false
 	InstanceWriteBufferSize                    int      // Instance write buffer size (max number of instances to flush in one INSERT ODKU)
 	BufferInstanceWrites                       bool     // Set to 'true' for write-optimization on backend table (compromise: writes can be stale and overwrite non stale data)
@@ -330,6 +332,8 @@ func newConfiguration() *Configuration {
 		DefaultInstancePort:                        3306,
 		TLSCacheTTLFactor:                          100,
 		InstancePollSeconds:                        5,
+		DeadInstancePollSecondsMultiplyFactor:		2,
+		DeadInstancePollSecondsMax:					5 * 60,
 		ReasonableInstanceCheckSeconds:             1,
 		InstanceWriteBufferSize:                    100,
 		BufferInstanceWrites:                       false,
@@ -626,6 +630,13 @@ func (this *Configuration) postReadAdjustments() error {
 		this.ReasonableLockedSemiSyncMasterSeconds = uint(this.ReasonableReplicationLagSeconds)
 	}
 
+	if this.DeadInstancePollSecondsMultiplyFactor < 1 {
+		return fmt.Errorf("DeadInstancePollSecondsMultiplyFactor can not be smaller than 1")
+	}
+
+	if this.DeadInstancePollSecondsMax < this.InstancePollSeconds {
+		return fmt.Errorf(("DeadInstancePollSecondsMax can not be smaller than InstancePollSeconds"))
+	}
 	return nil
 }
 
