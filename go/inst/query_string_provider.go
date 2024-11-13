@@ -53,6 +53,7 @@ const (
 	change_master_to_with_params
 	change_master_to_master_delay
 	set_sql_slave_skip_counter
+	change_master_to_get_source_public_key
 )
 
 func (qps *QueryStringProvider) log_slave_updates() string {
@@ -235,6 +236,10 @@ func (qps *QueryStringProvider) set_sql_slave_skip_counter() string {
 	return qps.queries[set_sql_slave_skip_counter]
 }
 
+func (qps *QueryStringProvider) change_master_to_get_source_public_key() string {
+	return qps.queries[change_master_to_get_source_public_key]
+}
+
 var queryStrings80 = map[QueryStringKey]string{
 	log_slave_updates:         "log_slave_updates",
 	start_slave:               "start slave",
@@ -282,6 +287,7 @@ var queryStrings80 = map[QueryStringKey]string{
 	change_master_to_with_params:                          "change master to %s",
 	change_master_to_master_delay:                         "change master to master_delay=%d",
 	set_sql_slave_skip_counter:                            "set global sql_slave_skip_counter := 1",
+	change_master_to_get_source_public_key:                "select 1",
 }
 
 var queryStrings84 = map[QueryStringKey]string{
@@ -331,6 +337,25 @@ var queryStrings84 = map[QueryStringKey]string{
 	change_master_to_with_params:                          "change replication source to %s",
 	change_master_to_master_delay:                         "change replication source to source_delay=%d",
 	set_sql_slave_skip_counter:                            "set global sql_replica_skip_counter := 1",
+	change_master_to_get_source_public_key:                "select 1",
+}
+
+func copyQueryStrings(original map[QueryStringKey]string) map[QueryStringKey]string {
+	copied := make(map[QueryStringKey]string, len(original))
+	for k, v := range original {
+		copied[k] = v
+	}
+	return copied
+}
+
+func queryStrings90() map[QueryStringKey]string {
+	// copy queries from 84 version
+	qs := copyQueryStrings(queryStrings84)
+
+	// customize it
+	qs[change_master_to_get_source_public_key] = "change replication source to get_source_public_key=1"
+
+	return qs
 }
 
 var queryStringProvider80 = QueryStringProvider{
@@ -341,8 +366,14 @@ var queryStringProvider84 = QueryStringProvider{
 	queries: queryStrings84,
 }
 
+var queryStringProvider90 = QueryStringProvider{
+	queries: queryStrings90(),
+}
+
 func GetQueryStringProvider(version string) QueryStringProvider {
-	if version >= "8.4" {
+	if version >= "9.0" {
+		return queryStringProvider90
+	} else if version >= "8.4" {
 		return queryStringProvider84
 	}
 	return queryStringProvider80
