@@ -35,7 +35,7 @@ import (
 	"github.com/openark/orchestrator/go/kv"
 	ometrics "github.com/openark/orchestrator/go/metrics"
 	"github.com/openark/orchestrator/go/process"
-	"github.com/openark/orchestrator/go/raft"
+	orcraft "github.com/openark/orchestrator/go/raft"
 	"github.com/openark/orchestrator/go/util"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
@@ -236,12 +236,20 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	discoveriesCounter.Inc(1)
 
 	// First we've ever heard of this instance. Continue investigation:
-	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites, latency)
+	skipped := false
+	instance, skipped, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites, latency)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it, but first get the timing metrics.
 	totalLatency := latency.Elapsed("total")
 	backendLatency := latency.Elapsed("backend")
 	instanceLatency := latency.Elapsed("instance")
+
+	if skipped {
+		if config.Config.EnableDiscoveryFiltersLogs {
+			log.Infof("discoverInstance: skipping discovery of %+v because its replication user matches DiscoveryIgnoreReplicationUsernameFilters", instanceKey)
+		}
+		return
+	}
 
 	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
@@ -282,7 +290,6 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	// Investigate replicas and members of the same replication group:
 	for _, replicaKey := range append(instance.ReplicationGroupMembers.GetInstanceKeys(), instance.Replicas.GetInstanceKeys()...) {
 		replicaKey := replicaKey // not needed? no concurrency here?
-
 		// Avoid noticing some hosts we would otherwise discover
 		if inst.FiltersMatchInstanceKey(&replicaKey, config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
 			continue
@@ -295,6 +302,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
 		if !inst.FiltersMatchInstanceKey(&instance.MasterKey, config.Config.DiscoveryIgnoreMasterHostnameFilters) {
+			log.Infof("KH: DiscoverInstance pushing master %+v to discoveryQueue", instance.MasterKey)
 			discoveryQueue.Push(instance.MasterKey)
 		}
 	}

@@ -272,3 +272,13 @@ func FiltersMatchInstanceKey(instanceKey *InstanceKey, filters []string) bool {
 	}
 	return false
 }
+
+func FiltersMatchReplicationIgnoreUsername(user string, filters []string) bool {
+	for _, filter := range filters {
+		if matched, _ := regexp.MatchString(filter, user); matched {
+
+			return true;
+		}
+	}
+	return false;
+}

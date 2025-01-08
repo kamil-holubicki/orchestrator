@@ -19,14 +19,15 @@ package inst
 import (
 	"errors"
 	"fmt"
-	"github.com/openark/golib/log"
-	"github.com/openark/orchestrator/go/config"
-	"github.com/patrickmn/go-cache"
 	"net"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/patrickmn/go-cache"
 )
 
 type HostnameResolve struct {
@@ -130,11 +131,13 @@ func ResolveHostname(hostname string) (string, error) {
 	if (&InstanceKey{Hostname: hostname}).IsDetached() {
 		// quietly abort. Nothing to do. The hostname is detached for a reason: it
 		// will not be resolved, for sure.
+		log.Infof("ResolveHostname %+v, detached", hostname)
 		return hostname, nil
 	}
 
 	// First go to lightweight cache
 	if resolvedHostname, found := getHostnameResolvesLightweightCache().Get(hostname); found {
+		log.Infof("ResolveHostname %+v, found in cache. Resolved: %+v", hostname, resolvedHostname)
 		return resolvedHostname.(string), nil
 	}
 
@@ -167,11 +170,13 @@ func ResolveHostname(hostname string) (string, error) {
 		// Problem. What we'll do is cache the hostname for just one minute, so as to avoid flooding requests
 		// on one hand, yet make it refresh shortly on the other hand. Anyway do not write to database.
 		getHostnameResolvesLightweightCache().Set(hostname, resolvedHostname, time.Minute)
+		log.Infof("ResolveHostname %+v problem", hostname)
 		return hostname, err
 	}
 	// Good result! Cache it, also to DB
 	log.Debugf("Cache hostname resolve %s as %s", hostname, resolvedHostname)
 	go UpdateResolvedHostname(hostname, resolvedHostname)
+	log.Infof("ResolveHostname %+v, end. Resolved: %+v", hostname, resolvedHostname)
 	return resolvedHostname, nil
 }
 
@@ -179,6 +184,7 @@ func ResolveHostname(hostname string) (string, error) {
 // Returns false when the key already existed with same resolved value (similar
 // to AFFECTED_ROWS() in mysql)
 func UpdateResolvedHostname(hostname string, resolvedHostname string) bool {
+	log.Infof("UpdateResolvedHostname %+v => %+v", hostname, resolvedHostname)
 	if resolvedHostname == "" {
 		return false
 	}
