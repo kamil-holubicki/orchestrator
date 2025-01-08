@@ -473,7 +473,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 		if FiltersMatchReplicationIgnoreUsername(user, config.Config.DiscoveryIgnoreReplicationUsernameFilters) {
 			err = fmt.Errorf("Host %+v is excluded from discovery by DiscoveryIgnoreReplicationUsernameFilters.", *instanceKey)
-			instanceDiscoverySkipped = true;
+			instanceDiscoverySkipped = true
 			log.Infof("KH: ReadTopologyInstanceBufferable short return from query %+v", instanceKey)
 			return err
 		}
@@ -755,9 +755,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		if err != nil {
 			logReadTopologyInstanceError(instanceKey, "NewResolveInstanceKey", err)
 		}
-		log.Infof("Instance: %+v, Resolving master hostname %+v", instanceKey, masterKey.Hostname);
+		log.Infof("Instance: %+v, Resolving master hostname %+v", instanceKey, masterKey.Hostname)
 		masterKey.Hostname, resolveErr = ResolveHostname(masterKey.Hostname)
-		log.Infof("Instance: %+v, Resolved master hostname %+v", instanceKey, masterKey.Hostname);
+		log.Infof("Instance: %+v, Resolved master hostname %+v", instanceKey, masterKey.Hostname)
 		if resolveErr != nil {
 			logReadTopologyInstanceError(instanceKey, fmt.Sprintf("ResolveHostname(%q)", masterKey.Hostname), resolveErr)
 		}
@@ -875,7 +875,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
   		`,
 				func(m sqlutils.RowMap) error {
 					cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
-					user := m.GetString("user");
+					user := m.GetString("user")
 					if resolveErr != nil {
 						logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 					}
