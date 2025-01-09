@@ -376,8 +376,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	var masterPortTmp int
 	var masterKey *InstanceKey
 
-	log.Debugf("ReadTopologyInstanceBufferable start: %+v", instanceKey)
-
 	if !instanceKey.IsValid() {
 		latency.Start("backend")
 		if err := UpdateInstanceLastAttemptedCheck(instanceKey); err != nil {
@@ -388,7 +386,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 
 	lastAttemptedCheckTimer := time.AfterFunc(time.Second, func() {
-		log.Infof("KH: ReadTopologyInstanceBufferable calling go UpdateInstanceLastAttemptedCheck for %+v", instanceKey)
 		go UpdateInstanceLastAttemptedCheck(instanceKey)
 	})
 
@@ -469,12 +466,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	err = sqlutils.QueryRowsMap(db, instance.QSP.show_slave_status(), func(m sqlutils.RowMap) error {
 		user := m.GetString(instance.QSP.master_user())
 
-		log.Infof("KH: ReadTopologyInstanceBufferable replicationUser of %+v: %+v", instanceKey, user)
-
 		if FiltersMatchReplicationIgnoreUsername(user, config.Config.DiscoveryIgnoreReplicationUsernameFilters) {
 			err = fmt.Errorf("Host %+v is excluded from discovery by DiscoveryIgnoreReplicationUsernameFilters.", *instanceKey)
 			instanceDiscoverySkipped = true
-			log.Infof("KH: ReadTopologyInstanceBufferable short return from query %+v", instanceKey)
 			return err
 		}
 
@@ -528,7 +522,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		return nil
 	})
 	if err != nil {
-		log.Infof("KH: ReadTopologyInstanceBufferable short return after query %+v", instanceKey)
 		goto Cleanup
 	}
 
@@ -755,14 +748,11 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		if err != nil {
 			logReadTopologyInstanceError(instanceKey, "NewResolveInstanceKey", err)
 		}
-		log.Infof("Instance: %+v, Resolving master hostname %+v", instanceKey, masterKey.Hostname)
 		masterKey.Hostname, resolveErr = ResolveHostname(masterKey.Hostname)
-		log.Infof("Instance: %+v, Resolved master hostname %+v", instanceKey, masterKey.Hostname)
 		if resolveErr != nil {
 			logReadTopologyInstanceError(instanceKey, fmt.Sprintf("ResolveHostname(%q)", masterKey.Hostname), resolveErr)
 		}
 		instance.MasterKey = *masterKey
-		log.Debugf("KH: found master %+v of %+v", masterKey, instanceKey)
 		instance.IsDetachedMaster = instance.MasterKey.IsDetached()
 	}
 
@@ -1085,7 +1075,6 @@ Cleanup:
 		return nil
 	}()
 
-	log.Infof("KH: ReadTopologyInstanceBufferable cleanup. instance: %+v, instanceFound: %+v", instanceKey, instanceFound)
 	if instanceFound {
 		if instance.IsCoMaster {
 			// Take co-master into account, and avoid infinite loop
@@ -1155,8 +1144,6 @@ Cleanup:
 		latency.Start("backend")
 		_ = UpdateInstanceLastChecked(&instance.Key, partialSuccess)
 		latency.Stop("backend")
-	} else {
-		log.Infof("KH: ReadTopologyInstanceBufferable instance skipped %+v", instanceKey)
 	}
 
 	return nil, instanceDiscoverySkipped, err
@@ -2888,10 +2875,6 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 	for _, instance := range instances {
 		if InstanceIsForgotten(&instance.Key) && !instance.IsSeed() {
 			continue
-		}
-		log.Infof("writeManyInstances() instance %+v", instance.Key)
-		if instance.Key.Port == 5000 {
-			log.Infof("got ya")
 		}
 		writeInstances = append(writeInstances, instance)
 	}

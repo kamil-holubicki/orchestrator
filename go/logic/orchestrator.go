@@ -290,6 +290,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	// Investigate replicas and members of the same replication group:
 	for _, replicaKey := range append(instance.ReplicationGroupMembers.GetInstanceKeys(), instance.Replicas.GetInstanceKeys()...) {
 		replicaKey := replicaKey // not needed? no concurrency here?
+
 		// Avoid noticing some hosts we would otherwise discover
 		if inst.FiltersMatchInstanceKey(&replicaKey, config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
 			continue
@@ -302,7 +303,6 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
 		if !inst.FiltersMatchInstanceKey(&instance.MasterKey, config.Config.DiscoveryIgnoreMasterHostnameFilters) {
-			log.Infof("KH: DiscoverInstance pushing master %+v to discoveryQueue", instance.MasterKey)
 			discoveryQueue.Push(instance.MasterKey)
 		}
 	}
