@@ -382,6 +382,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	db, err := db.OpenDiscovery(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		latency.Stop("instance")
+		RegisterDeadInstance(instanceKey)
 		goto Cleanup
 	}
 
@@ -391,9 +392,11 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 	err = db.Ping()
 	if err != nil {
+		RegisterDeadInstance(instanceKey)
 		goto Cleanup
 	}
 	latency.Stop("instance")
+	UnregisterDeadInstance(instanceKey)
 
 	if isMaxScale, resolvedHostname, err = instance.checkMaxScale(db, latency); err != nil {
 		// We do not "goto Cleanup" here, although it should be the correct flow.
@@ -2507,7 +2510,8 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		if merr != nil {
 			log.Errore(merr)
 		} else if !InstanceIsForgotten(instanceKey) {
-			// only if not in "forget" cache
+			// only if not in "forget" cache and the check is not delayed because of
+			// the node being not reachable
 			res = append(res, *instanceKey)
 		}
 		// We don;t return an error because we want to keep filling the outdated instances list.
