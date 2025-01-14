@@ -327,7 +327,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 			continue
 		}
 
-		dead, recheck := inst.DeadInstanceRecheckNeeded(&replicaKey)
+		dead, recheck := inst.DeadInstancesFilter.InstanceRecheckNeeded(&replicaKey)
 		if dead {
 			if recheck {
 				deadNodesDiscoveryQueue.Push(replicaKey)
@@ -341,7 +341,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
 		if !inst.FiltersMatchInstanceKey(&instance.MasterKey, config.Config.DiscoveryIgnoreMasterHostnameFilters) {
-		 	dead, recheck := inst.DeadInstanceRecheckNeeded(&instance.MasterKey)
+		 	dead, recheck := inst.DeadInstancesFilter.InstanceRecheckNeeded(&instance.MasterKey)
 
 			if dead {
 				if recheck {
@@ -419,7 +419,7 @@ func onHealthTick() {
 	if len(instanceKeys) > 0 {
 		for _, instanceKey := range instanceKeys {
 			if instanceKey.IsValid() {
-				dead, recheck := inst.DeadInstanceRecheckNeeded(&instanceKey)
+				dead, recheck := inst.DeadInstancesFilter.InstanceRecheckNeeded(&instanceKey)
 				if dead {
 					if (recheck) {
 						// this is a dead instance that needs recheck

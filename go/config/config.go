@@ -144,7 +144,8 @@ type Configuration struct {
 	InstancePollSeconds                        uint     // Number of seconds between instance reads
 	DeadInstancePollSecondsMultiplyFactor      float32  // InstancePoolSeconds increase factor for dead instances read time calculation
 	DeadInstancePollSecondsMax				   uint		// Maximum delay between dead instance read attempts
-	DeadInstanceDiscoveryMaxConcurrency        uint
+	DeadInstanceDiscoveryMaxConcurrency        uint		// Number of goroutines doing dead hosts discovery
+	DeadInstancesDiscoveryLogsEnabled		   bool
 	ReasonableInstanceCheckSeconds             uint     // Number of seconds an instance read is allowed to take before it is considered invalid, i.e. before LastCheckValid will be false
 	InstanceWriteBufferSize                    int      // Instance write buffer size (max number of instances to flush in one INSERT ODKU)
 	BufferInstanceWrites                       bool     // Set to 'true' for write-optimization on backend table (compromise: writes can be stale and overwrite non stale data)
@@ -336,6 +337,7 @@ func newConfiguration() *Configuration {
 		DeadInstancePollSecondsMultiplyFactor:		1,
 		DeadInstancePollSecondsMax:					5 * 60,
 		DeadInstanceDiscoveryMaxConcurrency:        0,
+		DeadInstancesDiscoveryLogsEnabled:			false,
 		ReasonableInstanceCheckSeconds:             1,
 		InstanceWriteBufferSize:                    100,
 		BufferInstanceWrites:                       false,
