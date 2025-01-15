@@ -52,7 +52,7 @@ const (
 // that were requested for discovery.  It can be continuously updated
 // as discovery process progresses.
 var discoveryQueue *discovery.Queue
-var deadNodesDiscoveryQueue *discovery.Queue
+var deadInstancesDiscoveryQueue *discovery.Queue
 var snapshotDiscoveryKeys chan inst.InstanceKey
 var snapshotDiscoveryKeysMutex sync.Mutex
 
@@ -185,35 +185,35 @@ func handleDiscoveryRequests() {
 	}
 
 	if config.Config.DeadInstanceDiscoveryMaxConcurrency > 0 {
-		deadNodesDiscoveryQueue = discovery.CreateOrReturnQueue("DEAD_NODES")
+		deadInstancesDiscoveryQueue = discovery.CreateOrReturnQueue("DEADINSTANCES")
 
 		// Register dead instances queue gauge only if the queue exists
 		metrics.Register("discoveries.dead_instances_queue_length", deadInstancesDiscoveryQueueLengthGauge)
 		ometrics.OnMetricsTick(func() {
-			deadInstancesDiscoveryQueueLengthGauge.Update(int64(deadNodesDiscoveryQueue.QueueLen()))
+			deadInstancesDiscoveryQueueLengthGauge.Update(int64(deadInstancesDiscoveryQueue.QueueLen()))
 		})
 
 		// create a pool of discovery workers
 		for i := uint(0); i < config.Config.DeadInstanceDiscoveryMaxConcurrency; i++ {
 			go func() {
 				for {
-					instanceKey := deadNodesDiscoveryQueue.Consume()
+					instanceKey := deadInstancesDiscoveryQueue.Consume()
 					// Possibly this used to be the elected node, but has
 					// been demoted, while still the queue is full.
 					if !IsLeaderOrActive() {
 						log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
-							"Remaining queue size: %+v", instanceKey, discoveryQueue.QueueLen())
-						deadNodesDiscoveryQueue.Release(instanceKey)
+							"Remaining queue size: %+v", instanceKey, deadInstancesDiscoveryQueue.QueueLen())
+						deadInstancesDiscoveryQueue.Release(instanceKey)
 						continue
 					}
 
 					DiscoverInstance(instanceKey)
-					deadNodesDiscoveryQueue.Release(instanceKey)
+					deadInstancesDiscoveryQueue.Release(instanceKey)
 				}
 			}()
 		}
 	} else {
-		deadNodesDiscoveryQueue = discoveryQueue
+		deadInstancesDiscoveryQueue = discoveryQueue
 	}
 }
 
@@ -330,7 +330,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		dead, recheck := inst.DeadInstancesFilter.InstanceRecheckNeeded(&replicaKey)
 		if dead {
 			if recheck {
-				deadNodesDiscoveryQueue.Push(replicaKey)
+				deadInstancesDiscoveryQueue.Push(replicaKey)
 			}
 			// dead, but not recheck time
 			continue
@@ -345,7 +345,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 
 			if dead {
 				if recheck {
-					deadNodesDiscoveryQueue.Push(instance.MasterKey)
+					deadInstancesDiscoveryQueue.Push(instance.MasterKey)
 				}
 			} else {
 				discoveryQueue.Push(instance.MasterKey)
@@ -423,7 +423,7 @@ func onHealthTick() {
 				if dead {
 					if (recheck) {
 						// this is a dead instance that needs recheck
-						deadNodesDiscoveryQueue.Push(instanceKey)
+						deadInstancesDiscoveryQueue.Push(instanceKey)
 					}
 					// If the instance is dead, but it is not a time to recheck it
 					// it will be filtered out here.

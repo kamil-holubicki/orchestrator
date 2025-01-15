@@ -9,6 +9,26 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
+// The behavior depends on settings:
+// 1. DeadInstanceDiscoveryMaxConcurrency > 0 and DeadInstancePollSecondsMultiplyFactor > 1:
+//    The separate discovery queue for dead instances is created and dead instances
+// 	  are checked by dedicated pool of go workers
+//    and the instance is checked with exponential backoff mechanism time
+// 2. DeadInstanceDiscoveryMaxConcurrency = 0 and DeadInstancePollSecondsMultiplyFactor > 1:
+//    No separate discovery queue for dead instances is created and dead instances
+//    are checked by the same pool of go workers as healthy instances, however
+//    an exponential backoff mechanism is applied for dead instances
+// 3. DeadInstanceDiscoveryMaxConcurrency > 0 and DeadInstancePollSecondsMultiplyFactor = 1:
+//    The separate discovery queue for dead instances is created and dead instances
+//    are checked by dedicated pool of go workers. No exponential backoff mechanism
+//    is applied for dead instances
+// 4. DeadInstanceDiscoveryMaxConcurrency = 0 and DeadInstancePollSecondsMultiplyFactor = 1:
+//    No separate discovery queue for dead instances, no dedicated go workers,
+//    no backoff mechanism. This is the default working mode.
+//
+// We register a dead instance always. It shouldn't be a big overhead,
+// and we will get the info about the dead instances count.
+
 type deadInstance struct {
 	DelayFactor 	float32
 	NextCheckTime   time.Time
@@ -30,27 +50,14 @@ func init() {
 	DeadInstancesFilter.deadInstancesMutex = sync.RWMutex{}
 }
 
+// RegisterInstance registers a given instance in a dead instances cache.
+// Once the instance is registered its discovery can be delayed with exponential
+// backoff mechanism according to DeadInstancePollSecondsMultiplyFactor value.
+// During the registration, next desired check time is calculated basing on
+// the current delay factor, DeadInstancePollSecondsMultiplyFactor and
+// DeadInstancePollSecondsMax parameters.
 func (f *deadInstancesFilter) RegisterInstance(instanceKey *InstanceKey) {
-	// The behavior depends on settings:
-	// 1. DeadInstanceDiscoveryMaxConcurrency > 0 and DeadInstancePollSecondsMultiplyFactor > 1:
-	//    The separate discovery queue for dead instances is created and dead instances
-	// 	  are checked by dedicated pool of go workers
-	//    and the instance is checked with exponential backoff mechanism time
-	// 2. DeadInstanceDiscoveryMaxConcurrency = 0 and DeadInstancePollSecondsMultiplyFactor > 1:
-	//    No separate discovery queue for dead instances is created and dead instances
-	//    are checked by the same pool of go workers as healthy instances, however
-	//    an exponential backoff mechanism is applied for dead instances
-	// 3. DeadInstanceDiscoveryMaxConcurrency > 0 and DeadInstancePollSecondsMultiplyFactor = 1:
-	//    The separate discovery queue for dead instances is created and dead instances
-	//    are checked by dedicated pool of go workers. No exponential backoff mechanism
-	//    is applied for dead instances
-	// 4. DeadInstanceDiscoveryMaxConcurrency = 0 and DeadInstancePollSecondsMultiplyFactor = 1:
-	//    No separate discovery queue for dead instances, no dedicated go workers,
-	//    no backoff mechanism. This is the default working mode.
-	//
-	// We register a dead instance always. It shouldn't be a big overhead,
-	// and we will get the info about the dead instances count.
-	currentIncreaseFactor := float32(1)
+	delayFactor := float32(1)
 	previousTry := 0
 
 	f.deadInstancesMutex.Lock()
@@ -58,42 +65,43 @@ func (f *deadInstancesFilter) RegisterInstance(instanceKey *InstanceKey) {
 
 	instance, exists := f.deadInstances[*instanceKey]
 	if exists {
-		currentIncreaseFactor = instance.DelayFactor
+		delayFactor = config.Config.DeadInstancePollSecondsMultiplyFactor * instance.DelayFactor
 		previousTry = instance.TryCnt
 	} else {
 		deadInstancesCounter.Inc(1)
 	}
 
-	newIncreaseFactor := config.Config.DeadInstancePollSecondsMultiplyFactor * currentIncreaseFactor
-
 	maxDelay := time.Duration(config.Config.DeadInstancePollSecondsMax) * time.Second
-	currentDelay := time.Duration(newIncreaseFactor * float32(config.Config.InstancePollSeconds)) * time.Second
+	currentDelay := time.Duration(delayFactor * float32(config.Config.InstancePollSeconds)) * time.Second
+
 	if currentDelay > maxDelay {
+		// saturation
 		currentDelay = maxDelay
-		newIncreaseFactor = currentIncreaseFactor
+		delayFactor = instance.DelayFactor  // back to previous one
 	}
 	nextCheck := time.Now().Add(currentDelay)
 
 	instance = deadInstance {
-		DelayFactor: newIncreaseFactor,
+		DelayFactor: delayFactor,
 		NextCheckTime: nextCheck,
 		TryCnt: previousTry + 1,
 	}
 	f.deadInstances[*instanceKey] = instance
 
-	if config.Config.DeadInstancesDiscoveryLogsEnabled {
-		log.Debugf("Dead instance registered %v:%v. Iteration: %v. Current wait factor: %v (next check in %v secs (on %v))",
+	if config.Config.DeadInstanceDiscoveryLogsEnabled {
+		log.Debugf("Dead instance registered %v:%v. Iteration: %v. Current delay factor: %v (next check in %v secs (on %v))",
 			instanceKey.Hostname, instanceKey.Port, instance.TryCnt, instance.DelayFactor, currentDelay, instance.NextCheckTime)
 	}
 }
 
+// UnregisterInstace removes the given instance from dead instances cache.
 func (f *deadInstancesFilter)UnregisterInstance(instanceKey *InstanceKey) {
 	f.deadInstancesMutex.Lock()
 	defer f.deadInstancesMutex.Unlock()
 
 	instance, exists := f.deadInstances[*instanceKey]
 	if exists {
-		if config.Config.DeadInstancesDiscoveryLogsEnabled {
+		if config.Config.DeadInstanceDiscoveryLogsEnabled {
 			log.Debugf("Dead instance unregistered: %v:%v after iteration: %v",
 				instanceKey.Hostname, instanceKey.Port, instance.TryCnt)
 		}
@@ -102,6 +110,11 @@ func (f *deadInstancesFilter)UnregisterInstance(instanceKey *InstanceKey) {
 	}
 }
 
+// InstanceRecheckNeeded checks if a given instance is registered in a dead instances
+// cache and if it is, is it time to rediscover it.
+// It returns two boolean values:
+// - The first boolean indicates if the instance is registered.
+// - The second boolean, indicates if it is time to rediscover the node.
 func (f *deadInstancesFilter)InstanceRecheckNeeded(instanceKey *InstanceKey) (bool, bool) {
 	f.deadInstancesMutex.RLock()
 	defer f.deadInstancesMutex.RUnlock()
@@ -109,16 +122,17 @@ func (f *deadInstancesFilter)InstanceRecheckNeeded(instanceKey *InstanceKey) (bo
 	instance, exists := f.deadInstances[*instanceKey]
 
 	if !exists {
-		return false, false
+		return exists, false
 	}
 
 	if instance.NextCheckTime.After(time.Now()) {
-		return true, false
+		// recheck time still in the future
+		return exists, false
 	}
 
-	if config.Config.DeadInstancesDiscoveryLogsEnabled {
+	if config.Config.DeadInstanceDiscoveryLogsEnabled {
 		log.Debugf("Dead instance recheck: %v:%v. Iteration: %v",
 			instanceKey.Hostname, instanceKey.Port, instance.TryCnt)
 	}
-	return true, true
+	return exists, true
 }
