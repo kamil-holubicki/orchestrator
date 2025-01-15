@@ -30,14 +30,14 @@ import (
 // and we will get the info about the dead instances count.
 
 type deadInstance struct {
-	DelayFactor 	float32
-	NextCheckTime   time.Time
-	TryCnt			int
+	DelayFactor   float32
+	NextCheckTime time.Time
+	TryCnt        int
 }
 
 type deadInstancesFilter struct {
-	deadInstances 		map[InstanceKey]deadInstance
-	deadInstancesMutex 	sync.RWMutex
+	deadInstances      map[InstanceKey]deadInstance
+	deadInstancesMutex sync.RWMutex
 }
 
 var DeadInstancesFilter deadInstancesFilter
@@ -72,30 +72,33 @@ func (f *deadInstancesFilter) RegisterInstance(instanceKey *InstanceKey) {
 	}
 
 	maxDelay := time.Duration(config.Config.DeadInstancePollSecondsMax) * time.Second
-	currentDelay := time.Duration(delayFactor * float32(config.Config.InstancePollSeconds)) * time.Second
+	currentDelay := time.Duration(delayFactor*float32(config.Config.InstancePollSeconds)) * time.Second
+
+	// needed only for the debug log below
+	delayFactorTmp := delayFactor
 
 	if currentDelay > maxDelay {
 		// saturation
 		currentDelay = maxDelay
-		delayFactor = instance.DelayFactor  // back to previous one
+		delayFactor = instance.DelayFactor // back to previous one
 	}
 	nextCheck := time.Now().Add(currentDelay)
 
-	instance = deadInstance {
-		DelayFactor: delayFactor,
+	instance = deadInstance{
+		DelayFactor:   delayFactor,
 		NextCheckTime: nextCheck,
-		TryCnt: previousTry + 1,
+		TryCnt:        previousTry + 1,
 	}
 	f.deadInstances[*instanceKey] = instance
 
 	if config.Config.DeadInstanceDiscoveryLogsEnabled {
 		log.Debugf("Dead instance registered %v:%v. Iteration: %v. Current delay factor: %v (next check in %v secs (on %v))",
-			instanceKey.Hostname, instanceKey.Port, instance.TryCnt, instance.DelayFactor, currentDelay, instance.NextCheckTime)
+			instanceKey.Hostname, instanceKey.Port, instance.TryCnt, delayFactorTmp, currentDelay, instance.NextCheckTime)
 	}
 }
 
 // UnregisterInstace removes the given instance from dead instances cache.
-func (f *deadInstancesFilter)UnregisterInstance(instanceKey *InstanceKey) {
+func (f *deadInstancesFilter) UnregisterInstance(instanceKey *InstanceKey) {
 	f.deadInstancesMutex.Lock()
 	defer f.deadInstancesMutex.Unlock()
 
@@ -115,7 +118,7 @@ func (f *deadInstancesFilter)UnregisterInstance(instanceKey *InstanceKey) {
 // It returns two boolean values:
 // - The first boolean indicates if the instance is registered.
 // - The second boolean, indicates if it is time to rediscover the node.
-func (f *deadInstancesFilter)InstanceRecheckNeeded(instanceKey *InstanceKey) (bool, bool) {
+func (f *deadInstancesFilter) InstanceRecheckNeeded(instanceKey *InstanceKey) (bool, bool) {
 	f.deadInstancesMutex.RLock()
 	defer f.deadInstancesMutex.RUnlock()
 
