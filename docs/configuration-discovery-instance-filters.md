@@ -1,9 +1,8 @@
 # Configuration: instance filters
 
-Sometimes it is desirable to exclude particular hosts from discovery.
-It may be the case for large, complex environments where auxiliary nodes like gh-ost, Debezium, Tungsten, etc., are present.
+At times, you may want to exclude particular hosts from discovery. For example, when utility nodes like gh-ost, Debzium, Tungsten, or other nodes that don't require monitoring are part of a large, complex environment.
 
-A node can be excluded by specifying its host's name regex pattern. When the Orchestrator detects such a node and its host name matches one of the given patterns, the node is skipped during the discovery process:
+To skip a node during the Discovery process, specify the host name using a regex pattern. If the host name matches the pattern, Orchestrator skips the node and continues the process:
 
 ```json
 {
@@ -15,7 +14,7 @@ A node can be excluded by specifying its host's name regex pattern. When the Orc
 }
 ```
 
-Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps:
+You can also use the regex patterns to prevent auto-discovering new replicas. These replicas may be on unreachable servers due to firewall rules:
 
 ```json
 {
@@ -27,7 +26,7 @@ Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreach
 }
 ```
 
-Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate some data from external host:
+Use the regexp patterns to prevent auto-discovering a master:
 
 ```json
 {
@@ -70,25 +69,30 @@ and
 
 Let's consider following discovery cases:
 
-## node_1 used for discovery
-Orchestrator learns that node_2 is the replica during the examination of node_1. If the replication user used by node_2 is known at this point, node_2 will be filtered out immediately and never queried.
-1. In the case of `DiscoverByShowSlaveHosts=true`, node_1 knows about node_2 replication user only if node_1 is started with `--show-replica-auth-info=1` and node_2 is configured with `report_user=<replication_user>`. If that's not the case, Orchestrator cannot filter out the replica, and node_2 will be scheduled for discovery.\
-Once the discovery for node_2 is started, Orchestrator checks its replication user name (but this needs querying of node_2), and if it matches the filter, node_2 is skipped.\
-To avoid this overhead, configure node_1 and node_2 properly.
-2. In the case of `DiscoverByShowSlaveHosts=false`, `information_schema.processlist` table is used. It contains the replica's replication user name, so node_2 will be skipped immediately and never queried.
+## Discovery process through node_1
+Orchestrator learns that node_2 is the replica during the examination of node_1. If the replication user used by node_2 is known at this point, node_2 will be filtered out immediately and never queried.\
+When Orchestrator examines node_1 and finds node_2 as a replica, two scenarios can occur:
+1. Using Show Slave Hosts (`DiscoverByShowSlaveHosts=true`):\
+Orchestrator can skip node_2 immediately if:
+    1. node_1 runs with `--show-replica-auth-info=1`
+    2. node_2 sets `report_user=<replication_user>`
+
+   Without these settings, Orchestrator must query node_2 directly. To avoid this overhead, configure node_1 and node_2 properly.
+2. Using Process List (`DiscoverByShowSlaveHosts=false`):\
+Orchestrator checks `information_schema.processlist`. This table shows the replica's replication user. Node_2 gets skipped without direct queries.
 
 As a result, only node_1 is discovered.
 
-## node_2 used for discovery
-While examining node_2, Orchestrator detects that its replication user name matches the given pattern and immediately reports the node is excluded from discovery.
+## Discovery process through node_2
+When starting discovery from node_2, Orchestrator checks the replication user name. If the name matches the filter pattern, discovery stops. No further nodes get discovered.
 
-Nothing will be discovered.
+## Discovery process through node_3
+When starting with node_3, Orchestrator finds node_2 as the source. The replication user for node_2 is unknown initially. Orchestrator schedules node_2 for discovery.\
+Upon examining node_2:
+* Finds matching replication user and skips further discovery
+* Node_1 remains undiscovered
 
-## node_3 used for discovery
-The Orchestrator learns about node_2 being the source during the examination of node_3. At this point Orchestrator doesn't know which replication user is used by node_2, so node_2 is scheduled for discovery. Then the Orchestrator discovers node_2, it detects that its replication user matches the filter pattern and skips the node. As it is skipped, node_1 is never examined. \
-Please note that during the discovery of node_3, it is not possible to know the replication user of node_2, so the Orchestrator needs to query node_2 for this information periodically.
-
-As a result, only node_3 is discovered.
+Only node_3 stays in the discovered set.
 
 ## Logs
 Orchestrator logs such discovery skips in its error log. Logging is enabled by default and controlled by the following setting:
