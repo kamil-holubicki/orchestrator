@@ -18,9 +18,9 @@ Configuration example:
 }
 ```
 
-`DeadInstanceDiscoveryMaxConcurrency` - default: 0. Determines the number of discovery workers dedicated to dead instances. If this pool size is grater than 0, the Orchestrator maintains a separate queue for dead instances.
+`DeadInstanceDiscoveryMaxConcurrency` (default: 0) - Determines the number of discovery workers dedicated to dead instances. If this pool size is grater than 0, the Orchestrator maintains a separate queue for dead instances.
 
-`DeadInstancePollSecondsMultiplyFactor` - default: 1. Floating point number, allowed values are >= 1. Determines how aggressive the backoff mechanism is. By default, when `DeadInstancePollSecondsMultiplyFactor = 1`, the instance is checked every `InstancePollSeconds` seconds. If the parameter value is greater than 1, every consecutive try `n` is done after the period calculated according to the formula:
+`DeadInstancePollSecondsMultiplyFactor` (default: 1) - Floating point number, allowed values are >= 1. Determines how aggressive the backoff mechanism is. By default, when `DeadInstancePollSecondsMultiplyFactor = 1`, the instance is checked every `InstancePollSeconds` seconds. If the parameter value is greater than 1, every consecutive try `n` is done after the period calculated according to the formula:
 
 dT(n) = InstancePollSeconds * DeadInstancePollSecondsMultiplyFactor ^ (n-1)
 
@@ -57,7 +57,7 @@ A separate discovery queue for dead instances is created, and dead instances are
 4. `DeadInstanceDiscoveryMaxConcurrency = 0` and `DeadInstancePollSecondsMultiplyFactor = 1`:\
 There is no separate discovery queue for dead instances, no dedicated go workers, no backoff mechanism. This is the default working mode.
 
-`DeadInstancePollSecondsMax` parameter controls the maximum time for backoff mechanism. If the backoff calculation goes beyond this value, it is considered as saturated and stays at `DeadInstancePollSecondsMax`
+`DeadInstancePollSecondsMax` (default: 300) - Controls the maximum time for backoff mechanism. If the backoff calculation goes beyond this value, it is considered as saturated and stays at `DeadInstancePollSecondsMax`
 
 ## Diagnostics
 Orchestrator provides `debug/metrics` web endpoint for diagnostics.

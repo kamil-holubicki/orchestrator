@@ -92,7 +92,7 @@ func (f *deadInstancesFilter) RegisterInstance(instanceKey *InstanceKey) {
 	f.deadInstances[*instanceKey] = instance
 
 	if config.Config.DeadInstanceDiscoveryLogsEnabled {
-		log.Debugf("Dead instance registered %v:%v. Iteration: %v. Current delay factor: %v (next check in %v secs (on %v))",
+		log.Debugf("Dead instance registered %v:%v. Iteration: %v. Current delay factor: %v (next check in %v (on %v))",
 			instanceKey.Hostname, instanceKey.Port, instance.TryCnt, delayFactorTmp, currentDelay, instance.NextCheckTime)
 	}
 }
