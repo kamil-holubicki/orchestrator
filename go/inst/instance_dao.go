@@ -2510,8 +2510,7 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		if merr != nil {
 			log.Errore(merr)
 		} else if !InstanceIsForgotten(instanceKey) {
-			// only if not in "forget" cache and the check is not delayed because of
-			// the node being not reachable
+			// only if not in "forget" cache
 			res = append(res, *instanceKey)
 		}
 		// We don;t return an error because we want to keep filling the outdated instances list.

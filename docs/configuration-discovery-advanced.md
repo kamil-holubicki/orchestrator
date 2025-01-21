@@ -1,10 +1,10 @@
 # Configuration: advanced discovery
 
-The Orchestrator maintains an internal queue of instances to discover. When the instance is scheduled to be discovered, it is added to the queue.
-The queue is consumed by discovery workers. The number of workers is configured via `DiscoveryMaxConcurrency` in a configuration file. This parameter configures how many discoveries can happen in parallel.
-To maintain the up-to-date view of the cluster, the Orchestrator has to monitor all instances using the above-described mechanism periodically. `InstancePollSeconds` configuration parameter says how often the Orchestrator should refresh the information.
+The Orchestrator uses an internal queue to manage instances for discovery. When an instance is ready for discovery, it gets added to the queue. Discovery workers process the queue. The `DiscoveryMaxConcurrency` setting in a configuration file controls the number of workers. This setting determines how many discoveries can happen in parallel.
 
-In the case when a lot of instances become inaccessible or unhealthy in the manner that examining them takes a long time and finishes with failure discovery workers may be busy mostly with these instances. At the same time healthy ones wait in a discovery queue and are not checked with the desired frequency. It may cause the Orchestrator to loose the proper view of the cluster.
+The Orchestrator uses this mechanism to periodically monitor all instances. `InstancePollSeconds` configuration parameter says how often the Orchestrator should refresh the information.
+
+When there is a lot of inaccessible or unhealthy instances, the Orchestrator may lose the proper view of the cluster and be late with needed recovery actions. This is because discoveries of such instances may take a long time and finish with failure anyway, at the same time consuming workers from the discovery workers pool. Healthy instances wait in the queue and they are not checked in a timely manner.
 
 To avoid this, Orchestrator can be configured to maintain a separate discovery queue for unhealthy instances. This queue is processed by a separate pool of workers. Additionally, an exponential time backoff mechanism can be applied for rechecking such instances.
 
