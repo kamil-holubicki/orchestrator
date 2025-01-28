@@ -2418,7 +2418,7 @@ func (this *HttpAPI) discoveryQueueMetricsRawCommon(params martini.Params, r ren
 	seconds, err := strconv.Atoi(params["seconds"])
 	log.Debugf("DiscoveryQueueMetricsRaw: seconds: %d", seconds)
 	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue  aggregated metrics"})
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue raw metrics"})
 		return
 	}
 
@@ -2451,7 +2451,7 @@ func (this *HttpAPI) DiscoveryQueueMetricsAggregated(params martini.Params, r re
 func (this *HttpAPI) DiscoveryQueueMetricsRaw2(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	queue, found := params["queue"]
 	if !found {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue aggregated metrics"})
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue raw metrics"})
 		return
 	}
 
